@@ -4,7 +4,6 @@
 
 #include "parse.h"
 
-
 #define img_path "/home/daniil/MIPT_shiz/course_1-4/file_systems/hw/fat16_parsing/imgs/disk.img"
 
 int main()
@@ -18,12 +17,13 @@ int main()
     }
 
     print_fat_info(fd);
-    uint32_t root_dir_start = find_root_dir_offset(fd);
-    printf("RootDirStart = %u\n", root_dir_start);
     list_files(fd);
 
-
     print_file_data(fd, "big.txt");
+    print_file_data(fd, "file1.txt");
+    print_file_data(fd, "file2.c");
+    print_file_data(fd, "file3.o");
+    print_file_data(fd, "file3.jpg");
 
     close(fd);
 
