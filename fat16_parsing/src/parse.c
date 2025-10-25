@@ -8,6 +8,11 @@
 #include <strings.h>
 #include <assert.h>
 
+#define DIR_END_FLAG 0x00
+#define RM_FILE_FLAG 0xE5
+#define LFN_FLAG 0x0F
+#define FAT_ENTRY_SIZE 2
+
 static const char *ATTRS[] = {
     [0] = "read-only",
     [1] = "hidden",
@@ -16,6 +21,7 @@ static const char *ATTRS[] = {
     [4] = "subdirectory",
     [5] = "archive"
 };
+
 
 static void print_file_attrs(uint8_t attrs)
 {
@@ -161,7 +167,7 @@ uint32_t static get_data_area_addr(struct fat_boot_sector *fat_bs)
 
     uint16_t dir_entries = fat_bs->dir_entries[0] | (fat_bs->dir_entries[1] << 8);
     uint16_t bytes_per_sector = fat_bs->sector_size[0] | (fat_bs->sector_size[1] << 8);
-    uint16_t root_dir_sectors = (dir_entries * 32 + bytes_per_sector - 1) / bytes_per_sector;
+    uint16_t root_dir_sectors = (dir_entries * sizeof(struct msdos_dir_entry) + bytes_per_sector - 1) / bytes_per_sector;
     return fat_bs->reserved + (fat_bs->fats * fat_bs->fat_length) + root_dir_sectors;
 }
 
@@ -183,8 +189,7 @@ void print_root_dir_info(int fd)
 
     uint32_t root_dir_offset = root_dir_sector * bytes_per_sector;
 
-    // Размер root directory в байтах (каждая запись 32 байта)
-    uint32_t root_dir_size = root_entries * 32;
+    uint32_t root_dir_size = root_entries * sizeof(struct msdos_dir_entry);
     uint32_t root_dir_sectors = (root_dir_size + bytes_per_sector - 1) / bytes_per_sector;
 
     printf("\n=== Root Directory Location ===\n");
@@ -226,15 +231,16 @@ static uint16_t find_cluster_by_name(int fat_fd, char *filename, struct fat_boot
         memcpy(&entry, buffer + cluster * sizeof(struct msdos_dir_entry), sizeof(struct msdos_dir_entry));
 
         // skip removed and LFN
-        if (entry.name[0] == 0xE5 || entry.attr == 0x0F)
+        if (entry.name[0] == RM_FILE_FLAG || entry.attr == LFN_FLAG)
             continue;
+        if (entry.name[0] == DIR_END_FLAG)
+            break;
 
         convert_fat_name(entry.name, buf);
-
         /* Unix only. */
         if (strcasecmp(filename, (char *)buf) == 0)
             return entry.start;
-    } while (++cluster && entry.name[0] != 0x00);
+    } while (++cluster);
 
     return 0;
 }
@@ -259,9 +265,9 @@ void list_files(int fat_fd)
         memcpy(&entry, buffer + cluster * sizeof(struct msdos_dir_entry), sizeof(struct msdos_dir_entry));
 
         /* Skip removed and LFN. */
-        if (entry.name[0] == 0xE5 || entry.attr == 0x0F)
+        if (entry.name[0] == RM_FILE_FLAG || entry.attr == LFN_FLAG)
             continue;
-        if (entry.name[0] == 0x00)
+        if (entry.name[0] == DIR_END_FLAG)
             break;
 
         print_fat_file_info(&entry);
