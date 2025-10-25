@@ -8,7 +8,6 @@
 
 int main()
 {
-    fprintf(stderr, "Main start.\n");
     int fd = open(img_path, O_RDONLY);
     if (fd < 0)
     {

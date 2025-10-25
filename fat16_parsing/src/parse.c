@@ -298,9 +298,9 @@ void print_file_data(int fat_fd, char *filename)
         pread(fat_fd, buf, sector_size * fat_bs.sec_per_clus, offset);
         buf[cluster_size] = '\0';
 
-        printf("%s\n", buf);
-
+        printf("%s", buf);
         memcpy(&next, buffer + file_start * 2, 2);
         file_start = next;
     }
+    printf("\n");
 }
