@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdbool.h>
 
 /* Column widths for formatted output */
 #define COL_PROCESS_WIDTH 20
@@ -37,7 +38,7 @@ int print_pid_info(const pid_t pid);
 /* Print all information (opened files and memory-mapped files) for a given PID */
 int print_all_pid_info(const pid_t pid);
 
-/* Print memory-mapped files for a given PID */
-void print_mmap_files(pid_t pid);
+/* Print PID info filtered by directory (shallow or deep) */
+int print_pid_info_filtered(const pid_t pid, const char *dirpath, bool deep);
 
 #endif /* LSOF_UTILS_H */

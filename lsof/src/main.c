@@ -10,6 +10,8 @@ static void print_usage(const char *prog_name)
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  -u <user>       List files opened by user\n");
     fprintf(stderr, "  -p <PID>        List files opened by process\n");
+    fprintf(stderr, "  +d <path>       List files opened in directory (shallow)\n");
+    fprintf(stderr, "  +D <path>       List files opened in directory (recursive)\n");
     fprintf(stderr, "Flags:\n");
     fprintf(stderr, "  --all           Include memory-mapped files (libraries)\n");
     fprintf(stderr, "\nExample:\n");
@@ -17,6 +19,8 @@ static void print_usage(const char *prog_name)
     fprintf(stderr, "  %s -u root --all          List files and libraries for root\n", prog_name);
     fprintf(stderr, "  %s -p 1234                List files opened by process 1234\n", prog_name);
     fprintf(stderr, "  %s -p 1234 --all          List files and libraries for process 1234\n", prog_name);
+    fprintf(stderr, "  %s +d /tmp                List files opened in /tmp\n", prog_name);
+    fprintf(stderr, "  %s +D /home               List files opened in /home (recursive)\n", prog_name);
 }
 
 static int check_root_privileges(void)
@@ -75,6 +79,14 @@ int main(const int argc, const char **argv)
             return p_cmd_all(argument);
         else
             return p_cmd(argument);
+    }
+    else if (strcmp(option, "+d") == 0)
+    {
+        return d_cmd(argument);
+    }
+    else if (strcmp(option, "+D") == 0)
+    {
+        return D_cmd(argument);
     }
     else
     {

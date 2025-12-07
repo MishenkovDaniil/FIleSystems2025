@@ -13,6 +13,12 @@ int p_cmd(const char *pid_str);
 /* List files opened by specific process (PID) including memory-mapped files */
 int p_cmd_all(const char *pid_str);
 
+/* List files opened in a directory (shallow search - top level only) */
+int d_cmd(const char *dirpath);
+
+/* List files opened in a directory recursively (deep search) */
+int D_cmd(const char *dirpath);
+
 #endif /* M_LSOF_H */
 
 
