@@ -181,16 +181,17 @@ void print_mmap_files(pid_t pid)
         return;
 
     char line[512];
-    while (fgets(line, sizeof(line), maps_file)) {
-        // Format: address perms offset dev ino pathname
-        // 56556556-56556556 r-xp 00000000 08:01 123456 /lib64/libc.so.6
-
+    /* /proc/%d/maps string format:
+     *          address          perms  offset   dev     ino                     pathname
+     * 7d20f037f000-7d20f0383000 r--p  00000000 103:02 10885850 /usr/lib/x86_64-linux-gnu/libgpg-error.so.0.32.1
+     */
+    while (fgets(line, sizeof(line), maps_file))
+    {
         char pathname[256] = "";
         // Parsing the line - taking the last "word" as pathname
         char *last_space = strrchr(line, ' ');
-        if (last_space && last_space[1] != '\n') {
+        if (last_space && last_space[1] != '\n')
             sscanf(last_space + 1, "%255s", pathname);
-        }
 
         // Skipping empty paths and system regions
         if (strlen(pathname) == 0 || pathname[0] != '/')
@@ -201,8 +202,10 @@ void print_mmap_files(pid_t pid)
             continue;
 
         // Showing only .so libraries and other files
-        if (strstr(pathname, ".so") || strstr(pathname, ".a")) {
-            print_formatted_row_s(process_name, "mem", cast_file_mod_to_str(stbuf.st_mode), stbuf.st_size, pathname);
+        if (strstr(pathname, ".so") || strstr(pathname, ".a"))
+        {
+            print_formatted_row_s(process_name, "mem",
+                cast_file_mod_to_str(stbuf.st_mode), stbuf.st_size, pathname);
         }
     }
 
