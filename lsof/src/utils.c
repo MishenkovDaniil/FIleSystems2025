@@ -103,6 +103,9 @@ int get_user_uid(const char *username, uid_t *out_uid)
 
 int proc_owner_uid(pid_t pid, uid_t *out_uid)
 {
+    assert(out_uid);
+    assert(pid > 0);
+
     char path[PATH_MAX];
     char buf[512];
     snprintf(path, sizeof(path), "/proc/%d/status", pid);
@@ -132,6 +135,8 @@ int proc_owner_uid(pid_t pid, uid_t *out_uid)
 int get_process_name(const pid_t pid, char *process_name, const unsigned int size)
 {
     assert(process_name);
+    assert(pid > 0);
+
     char process_name_file[64] = "";
     snprintf(process_name_file, sizeof(process_name_file), "/proc/%d/comm", pid);
 
