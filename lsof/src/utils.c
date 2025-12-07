@@ -237,12 +237,14 @@ int print_pid_info(const pid_t pid)
             continue;
 
         snprintf(filepath, sizeof(filepath), "/proc/%d/fd/%s", pid, entry->d_name);
-        if (readlink(filepath, real_filepath, PATH_MAX) < 0)
+        ssize_t bytes = readlink(filepath, real_filepath, PATH_MAX);
+        if (bytes < 0)
         {
             perror("readlink:");
             closedir(proc_dir);
             return -1;
         }
+        real_filepath[bytes] = '\0';
 
         struct stat stbuf;
         if (stat(real_filepath, &stbuf) == -1)
