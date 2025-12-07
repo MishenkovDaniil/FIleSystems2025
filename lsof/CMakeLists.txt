@@ -13,6 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(lsof STATIC
     src/lsof.c
+    src/utils.c
     src/main.c
 )
 
