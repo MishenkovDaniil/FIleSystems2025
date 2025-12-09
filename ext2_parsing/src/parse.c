@@ -69,9 +69,9 @@ struct ext2_group_desc
 
 struct ext2_inode
 {
-    uint16_t i_mode;
+    uint16_t i_mode; // тип файла и права доступа
     uint16_t i_uid;
-    uint32_t i_size;
+    uint32_t i_size; // размер  в байтах
     uint32_t i_atime;
     uint32_t i_ctime;
     uint32_t i_mtime;
@@ -81,7 +81,13 @@ struct ext2_inode
     uint32_t i_blocks;
     uint32_t i_flags;
     uint32_t i_osd1;
-    uint32_t i_block[15];
+    /*
+    [0 - 11] - прямые указатели
+    [12] - указатель на блок с указателями (single indirect)
+    [13] - указатель на блок single indirect блоков (double indirect)
+    [14] - указатель на блок double indirect блоков (triple indirect)
+    */
+    uint32_t i_block[15]; // массив указателей на блоки
     uint32_t i_generation;
     uint32_t i_file_acl;
     uint32_t i_dir_acl;
@@ -479,6 +485,136 @@ int print_file_data_by_name(int fd, const char *name)
     return 0;
 }
 
+/* Print all blocks occupied by file */
+static void print_file_blocks(int fd, const struct ext2_super_block *sb, const struct ext2_inode *inode, const char *filename)
+{
+    uint32_t block_size = block_size_from_sb(sb);
+    uint32_t ptrs_per_block = block_size / sizeof(uint32_t);
+    uint64_t size = inode->i_size;
+    int block_count = 0;
+
+    printf("\nBlocks occupied by '%s' (file size: %llu bytes):\n", filename, (unsigned long long)size);
+    printf("  Direct blocks:\n");
+
+    /* Direct blocks */
+    for (int i = 0; i < EXT2_NDIR_BLOCKS; ++i)
+    {
+        if (inode->i_block[i] == 0)
+            continue;
+        printf("    Block %d: %u\n", block_count, inode->i_block[i]);
+        block_count++;
+    }
+
+    uint32_t *ptr_buf = malloc(block_size);
+    if (!ptr_buf)
+        return;
+
+    /* Single indirect */
+    if (inode->i_block[EXT2_NDIR_BLOCKS] != 0)
+    {
+        printf("  Single indirect block: %u\n", inode->i_block[EXT2_NDIR_BLOCKS]);
+        if (pread_full(fd, ptr_buf, block_size, (off_t)inode->i_block[EXT2_NDIR_BLOCKS] * block_size) == (ssize_t)block_size)
+        {
+            printf("    Blocks referenced:\n");
+            for (uint32_t i = 0; i < ptrs_per_block; ++i)
+            {
+                if (ptr_buf[i] == 0)
+                    continue;
+                printf("      Block %d: %u\n", block_count, ptr_buf[i]);
+                block_count++;
+            }
+        }
+    }
+
+    /* Double indirect */
+    if (inode->i_block[EXT2_NDIR_BLOCKS + 1] != 0)
+    {
+        printf("  Double indirect block: %u\n", inode->i_block[EXT2_NDIR_BLOCKS + 1]);
+        if (pread_full(fd, ptr_buf, block_size, (off_t)inode->i_block[EXT2_NDIR_BLOCKS + 1] * block_size) == (ssize_t)block_size)
+        {
+            for (uint32_t i = 0; i < ptrs_per_block; ++i)
+            {
+                uint32_t lvl1_blk = ptr_buf[i];
+                if (lvl1_blk == 0)
+                    continue;
+
+                printf("    Level 1 indirect block: %u\n", lvl1_blk);
+                uint32_t *lvl1 = malloc(block_size);
+                if (!lvl1)
+                    continue;
+
+                if (pread_full(fd, lvl1, block_size, (off_t)lvl1_blk * block_size) == (ssize_t)block_size)
+                {
+                    printf("      Blocks referenced:\n");
+                    for (uint32_t j = 0; j < ptrs_per_block; ++j)
+                    {
+                        if (lvl1[j] == 0)
+                            continue;
+                        printf("        Block %d: %u\n", block_count, lvl1[j]);
+                        block_count++;
+                    }
+                }
+                free(lvl1);
+            }
+        }
+    }
+
+    /* Triple indirect */
+    if (inode->i_block[EXT2_NDIR_BLOCKS + 2] != 0)
+    {
+        printf("  Triple indirect block: %u\n", inode->i_block[EXT2_NDIR_BLOCKS + 2]);
+        if (pread_full(fd, ptr_buf, block_size, (off_t)inode->i_block[EXT2_NDIR_BLOCKS + 2] * block_size) == (ssize_t)block_size)
+        {
+            for (uint32_t i = 0; i < ptrs_per_block; ++i)
+            {
+                uint32_t dind_blk = ptr_buf[i];
+                if (dind_blk == 0)
+                    continue;
+
+                printf("    Level 2 indirect block: %u\n", dind_blk);
+                uint32_t *lvl2 = malloc(block_size);
+                if (!lvl2)
+                    continue;
+
+                if (pread_full(fd, lvl2, block_size, (off_t)dind_blk * block_size) == (ssize_t)block_size)
+                {
+                    for (uint32_t j = 0; j < ptrs_per_block; ++j)
+                    {
+                        uint32_t indir_blk = lvl2[j];
+                        if (indir_blk == 0)
+                            continue;
+
+                        printf("      Level 1 indirect block: %u\n", indir_blk);
+                        uint32_t *lvl1 = malloc(block_size);
+                        if (!lvl1)
+                        {
+                            free(lvl2);
+                            continue;
+                        }
+
+                        if (pread_full(fd, lvl1, block_size, (off_t)indir_blk * block_size) == (ssize_t)block_size)
+                        {
+                            printf("        Blocks referenced:\n");
+                            for (uint32_t k = 0; k < ptrs_per_block; ++k)
+                            {
+                                if (lvl1[k] == 0)
+                                    continue;
+                                printf("          Block %d: %u\n", block_count, lvl1[k]);
+                                block_count++;
+                            }
+                        }
+                        free(lvl1);
+                    }
+                }
+                free(lvl2);
+            }
+        }
+    }
+
+    free(ptr_buf);
+    printf("  Total data blocks: %d\n", block_count);
+}
+
 /* Resolve a full path like /dir1/dir2/file.txt */
 static int resolve_path_to_inode(int fd, struct ext2_super_block *sb, struct ext2_group_desc *gd, const char *path, unsigned int *out_inode)
 {
@@ -502,7 +638,8 @@ static int resolve_path_to_inode(int fd, struct ext2_super_block *sb, struct ext
         size_t len = 0;
         while (p[len] && p[len] != '/')
         {
-            if (len < sizeof(component)-1) component[len] = p[len];
+            if (len < sizeof(component)-1)
+                component[len] = p[len];
             len++;
         }
 
@@ -535,7 +672,7 @@ static int resolve_path_to_inode(int fd, struct ext2_super_block *sb, struct ext
     return 0;
 }
 
-int print_file_data_by_path(int fd, const char *path)
+int print_file_data_by_path(int fd, const char *path, int print_data)
 {
     struct ext2_super_block sb;
     if (read_superblock(fd, &sb) < 0)
@@ -597,6 +734,13 @@ int print_file_data_by_path(int fd, const char *path)
             }
             free(buf);
         }
+        return 0;
+    }
+
+    /* Print block information */
+    print_file_blocks(fd, &sb, &inode, path);
+    if (!print_data)
+    {
         return 0;
     }
 

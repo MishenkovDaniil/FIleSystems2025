@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 
     if (argc > 2)
     {
-        if (print_file_data_by_path(fd, argv[2]) < 0)
+        if (print_file_data_by_path(fd, argv[2], 0) < 0)
         {
             fprintf(stderr, "Failed to read path '%s'\n", argv[2]);
         }
