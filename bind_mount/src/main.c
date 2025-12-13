@@ -104,14 +104,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// perform bind mount of source onto rootpath
 	if (do_bind_mount(source, rootpath) != 0)
 	{
 		fprintf(stderr, "Failed to bind mount %s -> %s\n", source, rootpath);
 		return 1;
 	}
 
-	// chroot into rootpath
 	if (chdir(rootpath) != 0)
 	{
 		perror("chdir root");
@@ -128,8 +126,10 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// drop privileges to target user; set supplementary groups first
-	if (initgroups(username, gid) != 0)
+	mkdir("/mnt", 0755);
+	mount("tmpfs", "/mnt", "tmpfs", 0, "size=16M");
+
+	if (initgroups(username, gid) != 0) //set supplementary groups
 	{
 		perror("initgroups");
 		return 1;
@@ -145,9 +145,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// execute the command
 	char **cmd = &argv[idx];
-	execvp(cmd[0], cmd);
+	execvp(cmd[0], cmd); // give management to cmd
 	perror("execvp");
 	return 1;
 }
